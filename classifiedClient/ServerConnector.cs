@@ -25,6 +25,18 @@ namespace classifiedClient
 		protected string salt_masterkey;
 		protected string public_key;
 		protected string private_key;
+		protected string public_key_recipient;
+		private ServerConnector() { }
+		protected static ServerConnector instance;
+		public static ServerConnector Instance
+		{
+			get
+			{
+				if (instance == null)
+					instance = new ServerConnector();
+				return instance;
+			}
+		}
 		public async Task<HttpStatusCode> Register(String userName, String password)
 		{
 			byte[] bytes = new byte[64];
@@ -129,6 +141,21 @@ var masterkeyBytes = 	PBKDF2Sha256GetBytes(32, Encoding.Default.GetBytes(passwor
 				}
 				return result.StatusCode;
 			}
+		}
+		public async Task<HttpStatusCode> getPublicKey(string userName)
+		{
+			using (var client = new HttpClient())
+			{
+				var result = await client.GetAsync("https://webengserver.herokuapp.com/" + userName + "/pubkey");
+				if (result.StatusCode == HttpStatusCode.OK)
+				{
+					var content = await result.Content.ReadAsStringAsync();
+					dynamic response = JsonConvert.DeserializeObject(content);
+				public_key_recipient=	response.pubkey_user;
+				}
+				return result.StatusCode;
+			}
+		
 		}
 		private string getStringFromKey(AsymmetricKeyParameter key)
 		{

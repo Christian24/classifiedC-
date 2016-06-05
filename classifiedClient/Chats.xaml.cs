@@ -15,18 +15,26 @@ using System.Windows.Shapes;
 namespace classifiedClient
 {
 	/// <summary>
-	/// Interaction logic for Chat.xaml
+	/// Interaction logic for Chats.xaml
 	/// </summary>
-	public partial class Chat : Window
+	public partial class Chats : Window
 	{
 		ServerConnector connector = ServerConnector.Instance;
-		public Chat()
+		public Chats()
 		{
 			InitializeComponent();
 		}
-		public void SetUserName(string name)
+
+		private async void Button_Click(object sender, RoutedEventArgs e)
 		{
-			userName.Text = name;
+		var result = await	connector.getPublicKey(recipient.Text);
+			if(result == System.Net.HttpStatusCode.OK)
+			{
+				Chat chat = new Chat();
+				chat.SetUserName(recipient.Text);
+				chat.ShowDialog();
+			}
 		}
+	
 	}
 }

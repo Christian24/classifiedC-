@@ -20,7 +20,7 @@ namespace classifiedClient
 	/// </summary>
 	public partial class MainWindow : Window
 	{
-		ServerConnector connector = new ServerConnector();
+		ServerConnector connector = ServerConnector.Instance;
 		public MainWindow()
 		{
 			InitializeComponent();
@@ -28,12 +28,24 @@ namespace classifiedClient
 
 		private async void Button_Click(object sender, RoutedEventArgs e)
 		{
-			connector.Register(userName.Text, password.Text);
+		var result = await	connector.Register(userName.Text, password.Text);
+			if(result == System.Net.HttpStatusCode.Created)
+			{
+				Chats chats = new Chats();
+				chats.Show();
+				this.Close();
+			}
 		}
 
-		private void Button_Click_1(object sender, RoutedEventArgs e)
+		private async void Button_Click_1(object sender, RoutedEventArgs e)
 		{
-			connector.Login(userName.Text, password.Text);
+			var result = await connector.Login(userName.Text, password.Text);
+			if(result == System.Net.HttpStatusCode.OK)
+			{
+				Chats chats = new Chats();
+				chats.Show();
+				this.Close();
+			}
 		}
 	}
 }
