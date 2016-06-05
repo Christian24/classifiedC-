@@ -14,6 +14,7 @@ using Org.BouncyCastle.OpenSsl;
 using System.Net.Http;
 using System.Net;
 using Newtonsoft.Json;
+using Org.BouncyCastle.Crypto.Engines;
 
 namespace classifiedClient
 {
@@ -62,14 +63,16 @@ namespace classifiedClient
 
 			string privateKey = getStringFromKey(keys.Private);
 			string publicKey = getStringFromKey(keys.Public);
-			
+
+			AesEngine aesEngine = new AesEngine();
 
 
 			var aes =AesManaged.Create();
 			aes.BlockSize = 128;
 			aes.Mode = CipherMode.ECB;
 			aes.Key = masterkey;
-		var encryptor=	aes.CreateEncryptor();
+			
+			var encryptor=	aes.CreateEncryptor();
 			var privateBytes = Encoding.Default.GetBytes(privateKey);
 		var private_key_enc=	encryptor.TransformFinalBlock(privateBytes, 0, privateBytes.Length);
 			var private_key_export = Encoding.Default.GetString(private_key_enc);
@@ -106,9 +109,10 @@ var masterkeyBytes = 	PBKDF2Sha256GetBytes(32, Encoding.Default.GetBytes(passwor
 					var aes = AesManaged.Create();
 					aes.BlockSize = 128;
 					aes.Mode = CipherMode.ECB;
+					aes.Padding = PaddingMode.None;
 					aes.Key = masterkeyBytes;
 					var decryptor = aes.CreateDecryptor();
-					var bytes = Encoding.Default.GetBytes(private_key_encoded);
+					var bytes = Encoding.Default.GetBytes(Base64Decode(private_key_encoded));
 					try
 					{
 						private_key = Encoding.Default.GetString(decryptor.TransformFinalBlock(bytes, 0, bytes.Length));
