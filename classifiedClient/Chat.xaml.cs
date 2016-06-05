@@ -20,6 +20,7 @@ namespace classifiedClient
 	public partial class Chat : Window
 	{
 		ServerConnector connector = ServerConnector.Instance;
+		string publicKey;
 		public Chat()
 		{
 			InitializeComponent();
@@ -27,6 +28,10 @@ namespace classifiedClient
 		public void SetUserName(string name)
 		{
 			userName.Text = name;
+		}
+		public void SetPublicKey(string key)
+		{
+			publicKey = key;
 		}
 	}
 }

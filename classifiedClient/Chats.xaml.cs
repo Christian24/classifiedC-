@@ -28,10 +28,11 @@ namespace classifiedClient
 		private async void Button_Click(object sender, RoutedEventArgs e)
 		{
 		var result = await	connector.getPublicKey(recipient.Text);
-			if(result == System.Net.HttpStatusCode.OK)
+			if(result != string.Empty)
 			{
 				Chat chat = new Chat();
 				chat.SetUserName(recipient.Text);
+				chat.SetPublicKey(result);
 				chat.ShowDialog();
 			}
 		}

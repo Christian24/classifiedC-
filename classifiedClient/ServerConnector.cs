@@ -142,7 +142,7 @@ var masterkeyBytes = 	PBKDF2Sha256GetBytes(32, Encoding.Default.GetBytes(passwor
 				return result.StatusCode;
 			}
 		}
-		public async Task<HttpStatusCode> getPublicKey(string userName)
+		public async Task<string> getPublicKey(string userName)
 		{
 			using (var client = new HttpClient())
 			{
@@ -151,9 +151,9 @@ var masterkeyBytes = 	PBKDF2Sha256GetBytes(32, Encoding.Default.GetBytes(passwor
 				{
 					var content = await result.Content.ReadAsStringAsync();
 					dynamic response = JsonConvert.DeserializeObject(content);
-				public_key_recipient=	response.pubkey_user;
+				return	response.pubkey_user;
 				}
-				return result.StatusCode;
+				return string.Empty;
 			}
 		
 		}
