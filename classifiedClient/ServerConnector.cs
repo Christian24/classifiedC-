@@ -15,6 +15,7 @@ using System.Net.Http;
 using System.Net;
 using Newtonsoft.Json;
 using Org.BouncyCastle.Crypto.Engines;
+using System.Dynamic;
 
 namespace classifiedClient
 {
@@ -26,6 +27,7 @@ namespace classifiedClient
 		protected string public_key;
 		protected string private_key;
 		protected string public_key_recipient;
+		protected string login;
 		private ServerConnector() { }
 		protected static ServerConnector instance;
 		public static ServerConnector Instance
@@ -42,12 +44,12 @@ namespace classifiedClient
 			byte[] bytes = new byte[64];
 			using (var random = new RNGCryptoServiceProvider())
 			{
-				random.GetNonZeroBytes(bytes);
+				random.GetBytes(bytes);
 			}
 			
 			var salt = System.Text.Encoding.Default.GetString(bytes);
 			
-		var masterkey=	PBKDF2Sha256GetBytes(32, Encoding.Default.GetBytes(password), bytes, 10000);
+			var masterkey=	PBKDF2Sha256GetBytes(32, Encoding.Default.GetBytes(password), bytes, 10000);
 			Console.WriteLine("Masterkey: " + Encoding.Default.GetString(masterkey));
 			// Create a new instance of RSACryptoServiceProvider to generate
 			//public and private key data.  Pass an integer specifying a key-
@@ -72,7 +74,7 @@ namespace classifiedClient
 			rsa.Init(new Org.BouncyCastle.Crypto.KeyGenerationParameters(new Org.BouncyCastle.Security.SecureRandom(), 2048));
 			var keys = rsa.GenerateKeyPair();
 			
-
+			
 			string privateKey = getStringFromKey(keys.Private);
 			string publicKey = getStringFromKey(keys.Public);
 
@@ -97,7 +99,7 @@ namespace classifiedClient
 				param.Add("privkey_user_enc", Base64Encode(private_key_export));
 				var content = new FormUrlEncodedContent(param);
 			var result = await client.PostAsync("https://webengserver.herokuapp.com/" + userName, content);
-
+				login = userName;
 				return result.StatusCode;
 			}	
 			
@@ -127,13 +129,14 @@ var masterkeyBytes = 	PBKDF2Sha256GetBytes(32, Encoding.Default.GetBytes(passwor
 					var bytes = Encoding.Default.GetBytes(Base64Decode(private_key_encoded));
 					try
 					{
+						login = userName;
 						private_key = Encoding.Default.GetString(decryptor.TransformFinalBlock(bytes, 0, bytes.Length));
 						return result.StatusCode;
 					}
-					catch (Exception)
+					catch (Exception e)
 					{
 
-						throw;
+						throw e;
 					}
 			//private_key=	Encoding.Default.GetString(	decryptor.TransformFinalBlock(bytes, 0, bytes.Length));
 
@@ -141,6 +144,67 @@ var masterkeyBytes = 	PBKDF2Sha256GetBytes(32, Encoding.Default.GetBytes(passwor
 				}
 				return result.StatusCode;
 			}
+		}
+		public async Task<HttpStatusCode> sendMessage(string recipient,string message)
+		{
+			string currentPub = await getPublicKey(recipient);
+			if(currentPub != string.Empty)
+			{
+				TripleDESCryptoServiceProvider provider = new TripleDESCryptoServiceProvider();
+				provider.KeySize = 128;
+				provider.GenerateIV();
+				var iv = provider.IV;
+				provider.GenerateKey();
+				var key = provider.Key;
+				var aes = AesManaged.Create();
+				aes.BlockSize = 128;
+				aes.Mode = CipherMode.CBC;
+			var encryptor =	aes.CreateEncryptor();
+			var cipher =	encryptor.TransformFinalBlock(Encoding.Default.GetBytes(message), 0, Encoding.Default.GetBytes(message).Length);
+
+				using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider())
+				{
+					var pubkey = getKeyFromString(currentPub);
+					RSAParameters parameters = new RSAParameters();
+					parameters.Exponent = pubkey.Exponent.ToByteArrayUnsigned();
+					parameters.Modulus = pubkey.Modulus.ToByteArrayUnsigned();
+					RSA.ImportParameters(parameters);
+					var key_recipient_enc = RSA.EncryptValue(key);
+					SHA256Managed hasher = new SHA256Managed();
+					hasher.ComputeHash(Encoding.Default.GetBytes(private_key));
+					hasher.ComputeHash(Encoding.Unicode.GetBytes(login));
+					hasher.ComputeHash(cipher);
+					hasher.ComputeHash(iv);
+					hasher.ComputeHash(key_recipient_enc);
+					var sig_recipient = hasher.Hash;
+					SHA256Managed hasher2 = new SHA256Managed();
+					hasher2.ComputeHash(Encoding.Unicode.GetBytes(login));
+					hasher2.ComputeHash(cipher);
+					hasher2.ComputeHash(iv);
+					hasher2.ComputeHash(key_recipient_enc);
+					hasher2.ComputeHash(sig_recipient);
+					var timestamp = getUnixTimestamp();
+					var timestampBytes = Encoding.Default.GetBytes(timestamp.ToString());
+					hasher2.ComputeHash(timestampBytes);
+					hasher2.ComputeHash(Encoding.Unicode.GetBytes(recipient));
+					var sig_service = hasher2.Hash;
+					dynamic envelope = new ExpandoObject();
+					envelope.sender = login;
+					envelope.content_enc = Base64Encode(message);
+					envelope.key_recipient_enc = Encoding.UTF8.GetString(key_recipient_enc);
+					envelope.sig_recipient = Encoding.UTF8.GetString(sig_recipient);
+					envelope.timestamp = timestamp;
+					envelope.sig_service = Encoding.UTF8.GetString(sig_service);
+					envelope.recipient = recipient;
+					string json = JsonConvert.SerializeObject(envelope);
+					using (var client = new HttpClient())
+					{
+						var result = await client.PostAsync("https://webengserver.herokuapp.com/" + recipient + "/message", json);
+						return result.StatusCode;
+					}
+				}
+				}
+			return HttpStatusCode.BadRequest;
 		}
 		public async Task<string> getPublicKey(string userName)
 		{
@@ -156,6 +220,21 @@ var masterkeyBytes = 	PBKDF2Sha256GetBytes(32, Encoding.Default.GetBytes(passwor
 				return string.Empty;
 			}
 		
+		}
+		private RsaKeyParameters getKeyFromString(string keyString)
+		{
+			using (TextReader textReader = new StringReader(keyString))
+			{
+				PemReader reader = new PemReader(textReader);
+
+			return(RsaKeyParameters)	reader.ReadObject();
+			}
+			
+			
+		}
+		private Int32 getUnixTimestamp()
+		{
+			return (Int32)(DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
 		}
 		private string getStringFromKey(AsymmetricKeyParameter key)
 		{
